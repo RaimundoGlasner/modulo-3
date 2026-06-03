@@ -1,0 +1,872 @@
+% ============================================================
+%  informe_simulacion_nuez.tex
+%  Informe LNCS (Springer) - listo para compilar en Overleaf
+%  Motor recomendado: pdfLaTeX
+% ------------------------------------------------------------
+%  ADVERTENCIAS SOBRE DATOS FALTANTES (instruccion 3 del prompt):
+%   - Nombre de autor/es: no figura en los archivos adjuntos.
+%     Se usa "Autor et al." como marcador. Reemplazar por el
+%     nombre real antes de la entrega.
+%   - Institucion: los archivos solo revelan el contexto academico
+%     "Tecnicas y Herramientas Modernas, Tercer Anio". No figura
+%     el nombre de la universidad ni facultad. Completar el campo
+%     \institute con el dato real.
+% ============================================================
+
+\documentclass[runningheads]{llncs}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{hyperref}
+% Reducir espacio vertical antes/después de títulos de sección
+\usepackage{titlesec}
+\titlespacing*{\section}     {0pt}{10pt plus 2pt minus 2pt}{4pt plus 1pt minus 1pt}
+\titlespacing*{\subsection}  {0pt}{8pt  plus 2pt minus 2pt}{2pt plus 1pt minus 1pt}
+\titlespacing*{\subsubsection}{0pt}{6pt plus 1pt minus 1pt}{2pt plus 1pt minus 1pt}
+% Reducir espacio entre parrafos
+\setlength{\parskip}{2pt plus 1pt minus 1pt}
+
+% ------------------------------------------------------------
+%  Estilos TikZ para los diagramas de flujo de la cadena
+% ------------------------------------------------------------
+\tikzset{
+  entry/.style={rectangle, rounded corners, draw=green!60!black, fill=green!15,
+                text width=2.8cm, text centered, minimum height=1cm, font=\small},
+  storage/.style={cylinder, shape border rotate=90, draw=blue!60, fill=blue!10,
+                  text width=2.2cm, text centered, minimum height=1cm, font=\small},
+  process/.style={rectangle, draw=orange!70!black, fill=orange!15,
+                  text width=2.8cm, text centered, minimum height=1cm, font=\small},
+  problem/.style={rectangle, draw=red!70!black, fill=red!15,
+                  text width=2.8cm, text centered, minimum height=1cm, font=\small},
+  fixed/.style={rectangle, draw=yellow!70!black, fill=yellow!25,
+                text width=2.8cm, text centered, minimum height=1cm, font=\small},
+  missing/.style={rectangle, dashed, draw=gray!70, fill=gray!10,
+                  text width=2.8cm, text centered, minimum height=1cm, font=\small},
+  arrow/.style={-Stealth, thick, gray!60}
+}
+
+\begin{document}
+
+% ------------------------------------------------------------
+%  METADATOS
+% ------------------------------------------------------------
+\title{Simulación y Optimización de la Cadena Productiva de Nuez mediante Simul8}
+\titlerunning{Simulación de la Cadena Productiva de Nuez con Simul8}
+
+\author{Autor Lambda.}
+\authorrunning{Autor Lambda.}
+
+% Completar con el nombre real de la institucion (DATO NO DISPONIBLE en los archivos):
+\institute{Cátedra de Técnicas y Herramientas Modernas, Tercer Año\\
+\email{autor@institucion.edu}}
+
+\maketitle
+
+\begin{abstract}
+Este trabajo presenta el desarrollo, análisis y propuesta de mejora de un
+modelo de simulación de eventos discretos para una planta procesadora de
+nuez, construido con el software Simul8. El modelo original representa la
+cadena productiva desde dos fuentes de cosecha ---mecánica y manual---
+hasta el producto terminado, atravesando las etapas de recepción,
+despelonado/lavado, secado y calibrado. La simulación inicial reportó
+537 unidades completadas y un tiempo promedio en sistema de 20,73 minutos.
+El análisis crítico del modelo identificó siete problemas, de los cuales
+dos son críticos: la ausencia de tiempo de proceso en la etapa de secado
+---modelada erróneamente como un simple almacén--- y la omisión completa
+de la etapa de empaque. Estos defectos invalidan los indicadores obtenidos.
+Se proponen siete correcciones con parámetros específicos, incluyendo la
+incorporación de centros de trabajo para secado y empaque, la limitación
+de capacidad de la tolva, la configuración de turnos laborales y la
+ampliación de los indicadores registrados. El aporte del trabajo es
+metodológico: demuestra el valor de la simulación como herramienta de
+detección temprana de errores de diseño en sistemas productivos.
+
+\keywords{simulación de eventos discretos \and Simul8 \and cadena productiva
+\and nuez \and optimización \and manufactura}
+\end{abstract}
+
+% ============================================================
+\section{Introducción}
+\label{sec:introduccion}
+% ============================================================
+
+La industria de la nuez constituye un eslabón relevante de la cadena
+agroindustrial frutícola. El procesamiento de la nuez no se limita a la
+cosecha: comprende una secuencia de operaciones ---recepción, despelonado,
+lavado, secado, calibrado, selección y empaque--- en las que la eficiencia
+operativa determina tanto el costo unitario como la calidad final del
+producto. El secado, en particular, es una etapa decisiva: la humedad, la
+temperatura y el tiempo de exposición condicionan la conservación y el valor
+comercial de la nuez. En un contexto de márgenes ajustados y exigencias de
+calidad crecientes, anticipar cuellos de botella y dimensionar correctamente
+los recursos antes de la inversión física resulta económicamente estratégico.
+
+La simulación de eventos discretos (SED) es una herramienta ampliamente
+validada para el análisis de sistemas productivos de este tipo. A diferencia
+de los modelos analíticos cerrados, la SED captura la variabilidad de los
+tiempos de proceso, la interacción entre estaciones, la formación de colas y
+la contención de recursos compartidos. Permite experimentar sobre un modelo
+computacional ---sin riesgo ni costo sobre la planta real--- y observar el
+comportamiento dinámico del sistema a lo largo del tiempo. Para una cadena
+productiva con etapas heterogéneas en duración y variabilidad, como la del
+procesamiento de nuez, la SED ofrece un marco natural de análisis.
+
+El objetivo de este trabajo es triple: (i) documentar un modelo de
+simulación de la cadena productiva de nuez construido en Simul8;
+(ii) identificar de manera crítica los problemas de modelado que comprometen
+la validez de sus resultados; y (iii) proponer un conjunto de correcciones
+con parámetros concretos que conduzcan a un modelo representativo del proceso
+real. La herramienta empleada es Simul8, un paquete de simulación de eventos
+discretos orientado a la manufactura y los servicios. Fue elegido por su
+interfaz visual orientada a objetos ---centros de trabajo, almacenes,
+recursos y puntos de entrada/salida---, por la facilidad para configurar
+distribuciones estadísticas y turnos, y por su disponibilidad en versión
+académica.
+
+El resto del documento se organiza como sigue. La Sección~\ref{sec:sistema}
+describe el sistema productivo y los parámetros del modelo original. La
+Sección~\ref{sec:resultados} presenta los resultados de la simulación inicial.
+La Sección~\ref{sec:problemas} ---sección central del informe--- analiza los
+siete problemas de modelado detectados. La Sección~\ref{sec:mejoras} propone
+las correcciones y describe el modelo corregido. La
+Sección~\ref{sec:comparativo} contrasta el modelo original con el corregido.
+La Sección~\ref{sec:finanzas} presenta el análisis financiero derivado de la
+ejecución del modelo corregido en Simul8. Finalmente, la
+Sección~\ref{sec:conclusiones} sintetiza las conclusiones y delinea el trabajo
+futuro.
+
+% ============================================================
+\section{Descripción del sistema productivo}
+\label{sec:sistema}
+% ============================================================
+
+El sistema modelado corresponde a una planta procesadora de nuez que recibe
+materia prima desde el campo y la transforma en producto terminado. La planta
+opera sobre un flujo lineal de estaciones, alimentado por dos fuentes de
+materia prima que convergen en un punto de recepción común.
+
+\subsection{Fuentes de materia prima}
+\label{subsec:fuentes}
+
+El modelo contempla dos canales de ingreso de nuez, que reflejan dos
+modalidades de cosecha con características operativas distintas:
+
+\begin{itemize}
+  \item \textbf{Cosecha mecánica.} Ingreso de unidades mediante maquinaria
+        agrícola. Se modela con una distribución exponencial de media
+        6~minutos entre arribos, lo que genera aproximadamente 10~unidades
+        por hora. Es el canal de mayor tasa de llegada y aporta cerca del
+        72\,\% del flujo total de entrada.
+  \item \textbf{Cosecha manual.} Ingreso de unidades por recolección manual.
+        Se modela con una distribución normal de media 15~minutos y
+        desviación estándar 2~minutos, generando aproximadamente
+        4~unidades por hora. Es un canal más lento pero más predecible, y
+        aporta cerca del 28\,\% del flujo total.
+\end{itemize}
+
+La diferencia operativa esencial es la variabilidad: la cosecha mecánica,
+modelada como proceso exponencial, presenta un coeficiente de variación
+$CV=1$, mientras que la cosecha manual, modelada como normal, presenta un
+$CV\approx0{,}13$. Ambas corrientes alimentan la tolva de recepción.
+
+\subsection{Etapas del proceso}
+\label{subsec:etapas}
+
+El recorrido de una unidad de nuez a través del sistema sigue esta secuencia:
+
+\begin{enumerate}
+  \item \textbf{Recepción.} La nuez ingresa a la \texttt{Tolva\_Recepcion},
+        un almacén que actúa como buffer entre las fuentes de cosecha y la
+        primera operación.
+  \item \textbf{Despelonado / lavado.} El centro de trabajo
+        \texttt{Despelonado\_Lavado} retira el pelón y lava la nuez con un
+        tiempo de ciclo fijo de 3~minutos.
+  \item \textbf{Secado.} La unidad pasa por \texttt{Silos\_Secado}, un
+        almacén de capacidad 200, destinado a representar la etapa de secado.
+  \item \textbf{Calibrado / selección.} El centro de trabajo
+        \texttt{Calibrado\_Seleccion} clasifica la nuez por tamaño y calidad,
+        con un tiempo normal de media 8~minutos y desviación 1,5~minutos,
+        operado por 4~operarios.
+  \item \textbf{Producto terminado.} Las unidades procesadas abandonan el
+        sistema por el punto de salida \texttt{Producto\_Terminado}.
+\end{enumerate}
+
+La Tabla~\ref{tab:parametros} resume todos los parámetros del modelo
+original, extraídos directamente de la configuración de cada elemento en
+Simul8.
+
+\begin{table}[H]
+\centering
+\caption{Parámetros del modelo original de la cadena productiva de nuez.}
+\label{tab:parametros}
+\renewcommand{\arraystretch}{1.3}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{} l l l l p{4.5cm} @{}}
+\toprule
+\textbf{Elemento} & \textbf{Tipo} & \textbf{Distribución} &
+\textbf{Parámetros} & \textbf{Observaciones} \\
+\midrule
+\texttt{Cosecha\_Mecanica}  & Work Entry Point & Exponencial        & Media: 6 min                      & Alta variabilidad ($CV=1$) \\[2pt]
+\texttt{Cosecha\_Manual}    & Work Entry Point & Normal             & Media: 15 min,~$\sigma$: 2 min    & Más predecible \\[2pt]
+\texttt{Tolva\_Recepcion}   & Storage Bin      & ---                & Cap.: $\infty$                    & Buffer de recepción \\[2pt]
+\texttt{Despelonado\_Lavado}& Work Center      & Fijo               & 3 min                             & Sin variabilidad \\[2pt]
+\texttt{Silos\_Secado}      & Storage Bin      & ---                & Cap.: 200                         & Sin proceso de secado \\[2pt]
+\texttt{Calibrado\_Seleccion}& Work Center     & Normal             & Media: 8 min,~$\sigma$: 1,5 min   & 4 operarios \\[2pt]
+\texttt{Operario}           & Recurso          & ---                & 4 disponibles                     & Sin turnos configurados \\[2pt]
+\texttt{Producto\_Terminado}& Work Complete    & ---                & ---                               & Salida del sistema \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+La Figura~\ref{fig:cadena-original} representa la cadena productiva del
+modelo original. Los elementos correctamente modelados se muestran en verde;
+los elementos problemáticos, en rojo; la etapa de empaque ausente se indica
+con un recuadro punteado gris.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.5cm and 1.3cm]
+  % Entradas
+  \node[entry] (cm) {Cosecha\_Mecanica\\Exp. $\mu$=6 min};
+  \node[entry, below=of cm] (cman) {Cosecha\_Manual\\Normal 15$\pm$2 min};
+  % Tolva (problema: capacidad infinita)
+  \node[problem, right=2.4cm of cm, yshift=-1.1cm] (tolva)
+        {Tolva\_Recepcion\\Cap. $\infty$};
+  % Despelonado (correcto)
+  \node[process, right=of tolva] (desp) {Despelonado\_Lavado\\3 min fijo};
+  % Silos secado (problema: no procesa)
+  \node[problem, right=of desp] (silos) {Silos\_Secado\\Sin proceso};
+  % Calibrado (problema: cuello de botella)
+  \node[problem, right=of silos] (calib) {Calibrado\_Seleccion\\8$\pm$1,5 min};
+  % Empaque ausente
+  \node[missing, right=of calib] (emp) {Empaque\\(no modelado)};
+  % Salida
+  \node[entry, right=of emp] (prod) {Producto\_Terminado};
+  % Flechas
+  \draw[arrow] (cm.east)   -- (tolva.west);
+  \draw[arrow] (cman.east) -- (tolva.west);
+  \draw[arrow] (tolva) -- (desp);
+  \draw[arrow] (desp)  -- (silos);
+  \draw[arrow] (silos) -- (calib);
+  \draw[arrow, dashed] (calib) -- (emp);
+  \draw[arrow, dashed] (emp) -- (prod);
+\end{tikzpicture}}
+\caption{Diagrama de flujo del modelo original. Verde: elementos correctos;
+rojo: elementos problemáticos; gris punteado: etapa ausente.}
+\label{fig:cadena-original}
+\end{figure}
+
+% ============================================================
+\section{Resultados del modelo inicial}
+\label{sec:resultados}
+% ============================================================
+
+La ejecución del modelo original produjo los resultados resumidos en la
+Tabla~\ref{tab:kpi-original}. Se completaron 537~unidades en el punto de
+salida \texttt{Producto\_Terminado}, con un tiempo promedio en sistema de
+20,73~minutos por unidad. Al cierre de la corrida permanecían acumuladas
+374~unidades provenientes de la cosecha mecánica y 163~unidades de la
+cosecha manual, lo que da un total de 537~unidades en proceso.
+
+\begin{table}[H]
+\centering
+\caption{Indicadores de la simulación del modelo inicial.}
+\label{tab:kpi-original}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{l r}
+\toprule
+\textbf{Indicador} & \textbf{Valor} \\
+\midrule
+Unidades completadas (\texttt{Producto\_Terminado}) & 537 \\
+Tiempo promedio en sistema & 20,73 min \\
+Unidades acumuladas --- Cosecha Mecánica & 374 \\
+Unidades acumuladas --- Cosecha Manual & 163 \\
+Operarios activos al cierre & 4 de 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Tasa de entrada combinada}
+\label{subsec:tasa}
+
+La tasa de llegada total al sistema es la suma de las dos fuentes. La cosecha
+mecánica, con una media de 6~minutos entre arribos, aporta aproximadamente
+$60/6=10$~unidades por hora. La cosecha manual, con media de 15~minutos,
+aporta aproximadamente $60/15=4$~unidades por hora. La tasa de entrada
+combinada es, por lo tanto, de aproximadamente $\lambda\approx14$~unidades
+por hora.
+
+\subsection{Capacidad teórica de las estaciones}
+\label{subsec:capacidad}
+
+El contraste entre la tasa de entrada y la capacidad de servicio de cada
+estación permite una primera aproximación a la identificación de cuellos
+de botella:
+
+\begin{itemize}
+  \item \textbf{Despelonado / lavado.} Con un tiempo de ciclo fijo de
+        3~minutos y una réplica, la capacidad teórica es de $60/3=20$
+        unidades por hora. Supera la tasa de entrada combinada
+        (14~ud/h), por lo que \emph{no} constituye un cuello de botella.
+  \item \textbf{Calibrado / selección.} Con un tiempo medio de 8~minutos y
+        4~operarios trabajando en paralelo, la capacidad teórica es de
+        $4\times(60/8)=30$~unidades por hora. También supera la tasa de
+        entrada, por lo que \emph{teóricamente} no debería ser restrictor.
+\end{itemize}
+
+\subsection{Validez preliminar de los resultados}
+\label{subsec:validez}
+
+Aunque las capacidades teóricas sugieren un sistema holgado, los resultados
+de la Tabla~\ref{tab:kpi-original} deben considerarse \emph{preliminarmente
+inválidos}. El motivo central, que se desarrolla en la
+Sección~\ref{sec:problemas}, es que la etapa de secado no está modelada como
+un proceso con duración: la unidad de nuez atraviesa los
+\texttt{Silos\_Secado} de forma instantánea. Dado que el secado real de la
+nuez toma horas, un tiempo promedio en sistema de 20,73~minutos no puede
+representar la operación física. Los indicadores obtenidos describen un
+sistema que no existe.
+
+% ============================================================
+\section{Análisis de problemas identificados}
+\label{sec:problemas}
+% ============================================================
+
+Esta sección constituye el núcleo del informe. Se documentan los siete
+problemas de modelado detectados en el modelo original, ordenados por
+severidad decreciente. Cada problema se presenta con su descripción, la
+evidencia observable en Simul8 y su impacto sobre los resultados.
+
+\subsection{Ausencia de tiempo de proceso en el secado [CRÍTICO]}
+\label{subsec:p1}
+
+\textbf{Descripción.} La etapa de secado está modelada con el elemento
+\texttt{Silos\_Secado}, configurado como un \emph{Storage Bin} (almacén) y no
+como un \emph{Work Center} (centro de trabajo). Un almacén no aplica tiempo de
+proceso a las unidades: solo las contiene hasta que la estación siguiente las
+demanda.
+
+\textbf{Evidencia en el modelo.} En Simul8, \texttt{Silos\_Secado} aparece
+sin distribución de tiempo de ciclo y con 0~ítems al final de la corrida.
+Las unidades transitan por él de forma instantánea, sin representar el tiempo
+real de secado, que en la práctica oscila entre 8 y 24~horas.
+
+\textbf{Impacto.} Es el defecto más grave del modelo. El tiempo en sistema de
+20,73~minutos es completamente irreal: omite la etapa de mayor duración de
+toda la cadena. Además, en un proceso real la temperatura, la humedad y el
+tiempo de secado son críticos para la calidad de la nuez; un modelo que no
+representa esta etapa no puede usarse para decisiones operativas.
+
+\subsection{Etapa de empaque no modelada [CRÍTICO]}
+\label{subsec:p2}
+
+\textbf{Descripción.} El modelo conecta \texttt{Calibrado\_Seleccion}
+directamente con \texttt{Producto\_Terminado}, sin ninguna estación
+intermedia de empaque.
+
+\textbf{Evidencia en el modelo.} No existe ningún centro de trabajo de
+embolsado, envasado ni embalaje entre el calibrado y la salida del sistema.
+
+\textbf{Impacto.} El empaque es una etapa real con tiempo de proceso y
+recursos propios. Su omisión subestima el tiempo total en sistema y, lo que
+es más relevante, puede ocultar un cuello de botella: si el empaque fuera más
+lento que el calibrado, el modelo actual nunca lo revelaría.
+
+\subsection{Capacidad infinita en la Tolva de Recepción [ADVERTENCIA]}
+\label{subsec:p3}
+
+\textbf{Descripción.} El almacén \texttt{Tolva\_Recepcion} está configurado
+con capacidad infinita ($\infty$).
+
+\textbf{Evidencia en el modelo.} El campo de capacidad del Storage Bin no
+tiene límite definido. Al final de la corrida la tolva aparece con 0~ítems.
+
+\textbf{Impacto.} Una capacidad infinita oculta posibles saturaciones físicas
+del sistema de recepción. En la realidad la tolva tiene un volumen máximo;
+si se supera, las unidades entrantes deberían bloquearse o perderse. El
+modelo actual permite acumulaciones imposibles y, por lo tanto, no puede
+detectar este modo de falla.
+
+\subsection{Operación continua sin turnos laborales [ADVERTENCIA]}
+\label{subsec:p4}
+
+\textbf{Descripción.} Ningún recurso ni centro de trabajo tiene activada la
+opción \emph{Shift Dependent}.
+
+\textbf{Evidencia en el modelo.} El recurso \texttt{Operario} y los centros
+de trabajo operan sin calendario laboral asociado.
+
+\textbf{Impacto.} El modelo simula una producción continua 24/7. Si la planta
+opera en turnos ---por ejemplo, una jornada de 8~horas---, el modelo
+sobreestima la producción real, ya que asume operación durante las horas en
+las que la planta estaría detenida.
+
+\subsection{Insuficiencia de KPIs registrados [ADVERTENCIA]}
+\label{subsec:p5}
+
+\textbf{Descripción.} El modelo solo registra el \emph{Average Time in
+System} de \texttt{Producto\_Terminado}.
+
+\textbf{Evidencia en el modelo.} El \emph{Results Summary} contiene un único
+indicador. No se registran porcentajes de utilización, longitudes de cola ni
+throughput.
+
+\textbf{Impacto.} Sin indicadores de utilización por centro de trabajo,
+longitud de colas, throughput por hora y utilización de operarios, no es
+posible identificar el cuello de botella real ni dimensionar correctamente
+los recursos. El modelo no produce la información necesaria para la toma de
+decisiones.
+
+\subsection{Distribución Exponencial en Cosecha Mecánica [OBSERVACIÓN]}
+\label{subsec:p6}
+
+\textbf{Descripción.} La fuente \texttt{Cosecha\_Mecanica} usa una
+distribución exponencial para los tiempos entre arribos.
+
+\textbf{Evidencia en el modelo.} El \emph{Work Entry Point} está configurado
+con distribución exponencial de media 6~minutos.
+
+\textbf{Impacto.} La distribución exponencial tiene un coeficiente de
+variación $CV=1$, lo que implica alta variabilidad: pueden generarse ráfagas
+de arribos que no reflejan la operación real. Para maquinaria agrícola que
+opera a un ritmo aproximadamente constante, una distribución normal o de
+Erlang es más representativa.
+
+\subsection{Ausencia de período de calentamiento (warm-up) [OBSERVACIÓN]}
+\label{subsec:p7}
+
+\textbf{Descripción.} El modelo no define un período de calentamiento
+(\emph{warm-up period}).
+
+\textbf{Evidencia en el modelo.} Los 4~operarios aparecen activos al cierre
+de la corrida, lo que puede ser un artefacto del estado transitorio inicial.
+
+\textbf{Impacto.} Sin un período de calentamiento, los estadísticos recogidos
+incluyen el régimen transitorio inicial ---cuando el sistema aún se está
+llenando--- y no representan el estado estacionario. Esto sesga todos los
+indicadores promedio.
+
+\subsection{Resumen de problemas}
+\label{subsec:resumen-problemas}
+
+La Tabla~\ref{tab:resumen-problemas} sintetiza los siete problemas
+identificados, su severidad, el elemento afectado y el impacto sobre los
+indicadores del modelo.
+
+\begin{table}[H]
+\centering
+\caption{Resumen de los problemas identificados en el modelo original.}
+\label{tab:resumen-problemas}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{c X l l X}
+\toprule
+\textbf{ID} & \textbf{Descripción} & \textbf{Severidad} &
+\textbf{Elemento afectado} & \textbf{Impacto en KPIs} \\
+\midrule
+P1 & Secado sin tiempo de proceso & Crítico &
+\texttt{Silos\_Secado} & Tiempo en sistema irreal \\
+P2 & Etapa de empaque ausente & Crítico &
+Enlace Calibrado--Salida & Subestima tiempo total \\
+P3 & Tolva con capacidad infinita & Advertencia &
+\texttt{Tolva\_Recepcion} & Oculta saturaciones \\
+P4 & Sin turnos laborales & Advertencia &
+Recursos y centros & Sobreestima producción \\
+P5 & KPIs insuficientes & Advertencia &
+Results Summary & Impide hallar el cuello de botella \\
+P6 & Distribución exponencial en cosecha mecánica & Observación &
+\texttt{Cosecha\_Mecanica} & Variabilidad artificial \\
+P7 & Ausencia de warm-up & Observación &
+Configuración de corrida & Sesgo por estado transitorio \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================
+\section{Propuestas de mejora y modelo corregido}
+\label{sec:mejoras}
+% ============================================================
+
+Para cada uno de los siete problemas se propone una solución con parámetros
+específicos. El conjunto de correcciones define el modelo corregido,
+representado en la Figura~\ref{fig:cadena-corregida}.
+
+\subsection{Modelado del secado como Work Center}
+\label{subsec:m1}
+
+Se propone reemplazar el almacén \texttt{Silos\_Secado} por un centro de
+trabajo \texttt{Secado\_Nuez}, ubicado entre \texttt{Despelonado\_Lavado} y
+\texttt{Calibrado\_Seleccion}. El tiempo de proceso se modela con una
+distribución normal de media 960~minutos (16~horas) y desviación estándar
+120~minutos.
+
+\textbf{Justificación.} El secado real de la nuez toma entre 8 y 24~horas.
+Se adopta como valor central 16~horas, el punto medio del rango, y una
+desviación de 2~horas que cubre la variabilidad razonable del proceso sin
+generar valores negativos. Con esta corrección, el secado pasa a ser ---como
+es esperable--- la etapa de mayor duración de la cadena.
+
+\subsection{Incorporación del Work Center de Empaque}
+\label{subsec:m2}
+
+Se propone agregar un centro de trabajo \texttt{Empaque} entre
+\texttt{Calibrado\_Seleccion} y \texttt{Producto\_Terminado}, con
+distribución normal de media 5~minutos y desviación estándar 1~minuto.
+Se recomienda evaluar dos alternativas: que el empaque comparta el recurso
+\texttt{Operario} con el calibrado ---lo que introduciría contención de
+recursos--- o que disponga de un recurso independiente. La elección
+dependerá de la dotación real de personal de la planta.
+
+\subsection{Limitación de capacidad de la Tolva}
+\label{subsec:m3}
+
+Se propone definir una capacidad física finita para
+\texttt{Tolva\_Recepcion}. Como valor de prueba se adopta 80~unidades.
+Una capacidad acotada permite que el modelo detecte bloqueos y pérdidas de
+arribo cuando la tolva se satura, revelando un modo de falla que el modelo
+original no podía representar.
+
+\subsection{Configuración de turnos laborales}
+\label{subsec:m4}
+
+Se propone activar la opción \emph{Shift Dependent} en todos los recursos y
+centros de trabajo, asociándolos a un turno de 8~horas (07:00 a 15:00, de
+lunes a sábado). De este modo el modelo simula la operación efectiva de la
+planta y no una producción continua ficticia.
+
+\subsection{Ampliación de KPIs}
+\label{subsec:m5}
+
+Se propone activar la recolección de indicadores adicionales:
+
+\begin{itemize}
+  \item En cada centro de trabajo: porcentaje de utilización, longitud
+        promedio de cola y tiempo de espera.
+  \item En el recurso \texttt{Operario}: porcentaje de utilización del
+        recurso.
+  \item En \texttt{Producto\_Terminado}: throughput por hora.
+\end{itemize}
+
+Este conjunto ampliado de indicadores es condición necesaria para
+identificar el cuello de botella real y dimensionar los recursos.
+
+\subsection{Cambio de distribución en Cosecha Mecánica}
+\label{subsec:m6}
+
+Se propone reemplazar la distribución exponencial de
+\texttt{Cosecha\_Mecanica} por una distribución normal de media 6~minutos y
+desviación estándar 1~minuto. Esto reduce el coeficiente de variación de
+$CV=1$ a $CV\approx0{,}17$, eliminando las ráfagas artificiales y
+representando de forma más fiel el ritmo aproximadamente constante de la
+maquinaria agrícola.
+
+\subsection{Configuración de warm-up y extensión de la corrida}
+\label{subsec:m7}
+
+Se propone extender el tiempo de corrida a 43\,200~minutos (30~días) y
+definir un período de calentamiento de 2\,880~minutos (2~días). El warm-up
+descarta los estadísticos del régimen transitorio inicial, de modo que los
+indicadores reportados correspondan al estado estacionario del sistema.
+
+\subsection{Diagrama del modelo corregido}
+\label{subsec:diagrama-corregido}
+
+La Figura~\ref{fig:cadena-corregida} representa la cadena productiva
+corregida. Los elementos nuevos se muestran en verde; los elementos
+modificados respecto del modelo original, en amarillo.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.4cm and 1.1cm]
+  % Entradas
+  \node[fixed] (cm) {Cosecha\_Mecanica\\Normal 6$\pm$1 min};
+  \node[entry, below=of cm] (cman) {Cosecha\_Manual\\Normal 15$\pm$2 min};
+  % Tolva (modificada: capacidad limitada)
+  \node[fixed, right=2.2cm of cm, yshift=-1.0cm] (tolva)
+        {Tolva\_Recepcion\\Cap. 80};
+  % Despelonado
+  \node[entry, right=of tolva] (desp) {Despelonado\_Lavado\\3 min fijo};
+  % Secado (NUEVO work center)
+  \node[entry, right=of desp] (secado) {Secado\_Nuez\\Normal 960$\pm$120 min};
+  % Calibrado
+  \node[entry, right=of secado] (calib) {Calibrado\_Seleccion\\8$\pm$1,5 min};
+  % Empaque (NUEVO work center)
+  \node[entry, right=of calib] (emp) {Empaque\\Normal 5$\pm$1 min};
+  % Salida
+  \node[entry, right=of emp] (prod) {Producto\_Terminado};
+  % Flechas
+  \draw[arrow] (cm.east)   -- (tolva.west);
+  \draw[arrow] (cman.east) -- (tolva.west);
+  \draw[arrow] (tolva)  -- (desp);
+  \draw[arrow] (desp)   -- (secado);
+  \draw[arrow] (secado) -- (calib);
+  \draw[arrow] (calib)  -- (emp);
+  \draw[arrow] (emp)    -- (prod);
+\end{tikzpicture}}
+\caption{Diagrama de flujo del modelo corregido. Verde: elementos nuevos o
+correctos; amarillo: elementos modificados respecto del modelo original.}
+\label{fig:cadena-corregida}
+\end{figure}
+
+% ============================================================
+\section{Análisis comparativo (modelo original vs.\ corregido)}
+\label{sec:comparativo}
+% ============================================================
+
+La Tabla~\ref{tab:comparativo} contrasta los indicadores del modelo original
+con los esperados para el modelo corregido. Dado que el modelo corregido aún
+no ha sido ejecutado (véase la Sección~\ref{sec:conclusiones}), la columna
+correspondiente expresa el comportamiento \emph{esperado} sobre la base del
+análisis cualitativo.
+
+\begin{table}[H]
+\centering
+\caption{Comparación entre el modelo original y el modelo corregido esperado.}
+\label{tab:comparativo}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{X l l X}
+\toprule
+\textbf{KPI} & \textbf{Modelo original} &
+\textbf{Modelo corregido (esperado)} & \textbf{Diferencia} \\
+\midrule
+Tiempo promedio en sistema & 20,73 min &
+$\approx$ 16--17 h & Cambio radical: incorpora el secado \\
+Cuello de botella & Calibrado (aparente) &
+\texttt{Secado\_Nuez} & Se reubica al nuevo proceso dominante \\
+Etapas modeladas & 4 & 6 & Suma secado y empaque \\
+Throughput diario & Sin límite horario &
+Acotado por turno de 8 h & Puede mantenerse similar por hora \\
+Capacidad de la tolva & $\infty$ & 80 ud &
+Permite detectar bloqueos \\
+KPIs registrados & 1 & $>$ 6 & Habilita el análisis de cuellos de botella \\
+Estado de los estadísticos & Con transitorio & Estacionario (warm-up) &
+Elimina el sesgo inicial \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+El KPI que cambia de forma más drástica es el tiempo promedio en sistema:
+pasa de 20,73~minutos a un valor del orden de las 16~a~17~horas, dominado
+por la etapa de secado. En cambio, el throughput por hora ---durante las
+horas efectivas de operación--- puede mantenerse en valores similares,
+puesto que el cuello de botella en términos de \emph{tasa} sigue
+condicionado por las estaciones de procesamiento rápido y por la tasa de
+entrada. El nuevo cuello de botella esperado, en términos de \emph{tiempo de
+ciclo}, es \texttt{Secado\_Nuez}, por ser la estación de mayor duración del
+sistema.
+
+El fundamento teórico de esta relación es la Ley de Little, que vincula el
+inventario promedio en el sistema $L$, la tasa de arribos $\lambda$ y el
+tiempo promedio en sistema $W$:
+
+\begin{equation}
+L = \lambda \times W
+\label{eq:little}
+\end{equation}
+
+Al incrementarse $W$ por la incorporación del secado, y manteniéndose
+aproximadamente constante la tasa de arribos $\lambda$, la
+Ecuación~\eqref{eq:little} predice un aumento proporcional del inventario
+promedio $L$ en el sistema. Es decir, el modelo corregido mostrará una
+cantidad de trabajo en proceso (WIP) considerablemente mayor que el modelo
+original, lo cual es coherente con un proceso que efectivamente retiene las
+unidades durante horas en la etapa de secado.
+
+% ============================================================
+\section{Análisis financiero del modelo corregido}
+\label{sec:finanzas}
+% ============================================================
+
+El modelo corregido \textsc{Produccion\_Nueces\_Tyhm} fue ejecutado en Simul8
+con el módulo Finance activo. La Tabla~\ref{tab:income-statement} reproduce
+los valores reportados directamente por el \emph{Income Statement} de Simul8
+al término de la corrida.
+
+\begin{table}[H]
+\centering
+\caption{Estado de resultados generado por Simul8 --- modelo corregido
+(\textsc{Produccion\_Nueces\_Tyhm}).}
+\label{tab:income-statement}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{} l r @{}}
+\toprule
+\textbf{Concepto} & \textbf{Monto (\$)} \\
+\midrule
+Costos totales  & 15.801.187,06 \\
+Ingresos totales & 115.500.000,00 \\
+\midrule
+\textbf{Beneficio neto} & \textbf{99.698.812,94} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Métricas de rentabilidad}
+\label{subsec:rentabilidad}
+
+A partir de los datos del \emph{Income Statement} y del throughput registrado
+---33~unidades completadas en \texttt{Producto\_Terminado} durante la corrida---
+se derivan los indicadores de rentabilidad de la Tabla~\ref{tab:kpi-financieros}.
+
+\begin{table}[H]
+\centering
+\caption{Indicadores financieros derivados de la simulación.}
+\label{tab:kpi-financieros}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} l r @{}}
+\toprule
+\textbf{Indicador} & \textbf{Valor} \\
+\midrule
+Unidades completadas (throughput)       & 33 \\
+Ingreso por unidad                      & \$ 3.500.000,00 \\
+Costo por unidad                        & \$ 479.127,49 \\
+Beneficio por unidad                    & \$ 3.020.872,51 \\
+Margen de beneficio bruto               & 86,3\,\% \\
+Relación costo / ingreso                & 13,7\,\% \\
+Tiempo promedio en sistema              & 24.618,18 min ($\approx$17,1 días) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Interpretación de los resultados financieros}
+\label{subsec:interpretacion-finanzas}
+
+El margen de beneficio bruto del 86,3\,\% indica que los costos operativos
+modelados representan apenas el 13,7\,\% de los ingresos generados, lo que
+sugiere una estructura de costos favorable. Este resultado debe interpretarse
+con cautela: el modelo Simul8 captura los costos de los recursos asignados
+(mano de obra por hora de operación) y los ingresos por unidad completada,
+pero no incluye costos de capital, mantenimiento de maquinaria, insumos
+agrícolas ni logística de distribución, que en una planta real representan
+una fracción significativa del costo total.
+
+El throughput de 33~unidades completadas durante la corrida es notablemente
+inferior al modelo original (537~unidades), lo cual es consistente con la
+incorporación del centro de trabajo \texttt{Secado\_Nuez}: el tiempo de
+proceso de 960~minutos (16~horas) en promedio actúa como cuello de botella
+del sistema, reduciendo la tasa de salida respecto al modelo original ---que
+no modelaba esta etapa--- en más de un orden de magnitud. El ingreso por
+unidad de \$~3.500.000 refleja el valor agregado acumulado a lo largo de
+toda la cadena productiva.
+
+La Ley de Little (Ecuación~\ref{eq:little}) explica la relación entre el
+bajo throughput y el elevado tiempo en sistema: con $W = 24.618$ minutos
+($\approx 17{,}1$~días) y $L = 33$~unidades, la tasa efectiva de salida
+implícita es $\lambda = L/W \approx 0{,}00134$ unidades por minuto,
+equivalente a aproximadamente 1,93~unidades por día. Este valor es coherente
+con una etapa de secado que retiene cada lote durante más de 16~horas antes
+de liberarlo aguas abajo.
+
+\subsection{Limitaciones del análisis financiero}
+\label{subsec:limitaciones-financiero}
+
+El análisis financiero presentado tiene las siguientes limitaciones que deben
+tenerse en cuenta al interpretar los resultados:
+
+\begin{itemize}
+  \item \textbf{Costos parciales.} El módulo Finance de Simul8 computa costos
+        de recursos (tiempo de mano de obra activa); no incluye costos fijos,
+        depreciación, insumos ni logística.
+  \item \textbf{Parámetros de ingreso estimados.} El ingreso por unidad surge
+        de los valores configurados en el modelo; deben validarse con precios
+        reales de mercado.
+  \item \textbf{Corrida única sin warm-up efectivo.} Los resultados corresponden
+        a una única corrida. Para obtener intervalos de confianza robustos se
+        recomienda ejecutar al menos 30~réplicas independientes y aplicar el
+        período de calentamiento de 2.880~minutos especificado en la
+        Sección~\ref{subsec:m7}.
+  \item \textbf{Throughput reducido.} Las 33~unidades completadas representan
+        el estado de la simulación en el horizonte de corrida configurado; una
+        corrida de mayor duración (30~días) aportaría estadísticos más
+        representativos del estado estacionario.
+\end{itemize}
+
+% ============================================================
+\section{Conclusiones}
+\label{sec:conclusiones}
+% ============================================================
+
+Este trabajo desarrolló el ciclo completo de modelado, análisis crítico y
+propuesta de corrección de un modelo de simulación de eventos discretos de
+la cadena productiva de nuez en Simul8. A partir del modelo original se
+identificaron siete problemas de modelado y, para cada uno, se formuló una
+corrección con parámetros concretos. El resultado es un modelo corregido que
+representa de forma más fiel la operación real de la planta.
+
+Los dos problemas críticos detectados ---el secado modelado como un simple
+almacén sin tiempo de proceso, y la ausencia total de la etapa de empaque---
+son determinantes. El primero hace que el indicador central del modelo, el
+tiempo promedio en sistema de 20,73~minutos, carezca por completo de validez:
+omite la etapa más larga de toda la cadena. El segundo subestima el tiempo
+total y puede enmascarar un cuello de botella en la operación de envasado.
+En conjunto, ambos defectos invalidan el modelo original como herramienta de
+decisión y muestran que un modelo de simulación visualmente completo puede,
+no obstante, ser estructuralmente incorrecto.
+
+El valor del trabajo es metodológico. La simulación de eventos discretos se
+revela como una herramienta eficaz de detección temprana de problemas en el
+diseño de sistemas productivos: el solo ejercicio de revisar críticamente la
+estructura del modelo ---qué elementos procesan, cuáles solo almacenan, qué
+etapas faltan, qué indicadores se registran--- expone errores de concepción
+antes de cualquier inversión física. Las limitaciones del trabajo actual son
+claras: el modelo corregido fue especificado pero no ejecutado, y no se
+dispuso de datos reales de una planta concreta para validar los parámetros
+propuestos; varios valores ---tiempo de secado, capacidad de la tolva,
+tiempos de empaque--- son estimaciones razonables que requieren confirmación
+empírica.
+
+Como trabajo futuro se propone: (i) implementar y ejecutar el modelo
+corregido en Simul8; (ii) validar los parámetros con datos reales de una
+planta procesadora de nuez; y (iii) realizar un análisis de escenarios que
+contemple, entre otras alternativas, la incorporación de un turno nocturno,
+el aumento de la dotación de operarios y la ampliación de la capacidad de la
+tolva, con el fin de optimizar el desempeño global de la cadena.
+
+% ============================================================
+%  REFERENCIAS
+% ============================================================
+\begin{thebibliography}{8}
+
+\bibitem{banks2010}
+Banks, J., Carson, J.S., Nelson, B.L., Nicol, D.M.:
+Discrete-Event System Simulation, 5th edn.
+Pearson, Upper Saddle River (2010)
+
+\bibitem{law2015}
+Law, A.M.:
+Simulation Modeling and Analysis, 5th edn.
+McGraw-Hill, New York (2015)
+
+\bibitem{simul8}
+Simul8 Corporation:
+Simul8 Professional User Guide.
+Simul8 Corporation, Boston (2023)
+
+\bibitem{hopp2011}
+Hopp, W.J., Spearman, M.L.:
+Factory Physics, 3rd edn.
+Waveland Press, Long Grove (2011)
+
+\bibitem{inc2023}
+International Nut and Dried Fruit Council:
+Nuts \& Dried Fruits Statistical Yearbook.
+INC, Reus (2023)
+
+\end{thebibliography}
+
+\end{document}
